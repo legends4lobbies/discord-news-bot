@@ -1,23 +1,21 @@
+import os
 import requests
 from bs4 import BeautifulSoup
 import json
-import time
 import openai
 from datetime import datetime
 
+# Charger les secrets depuis les variables d'environnement
+openai.api_key = os.getenv('OPENAI_API_KEY')
+discord_webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
+
 # URL du site à surveiller
 site_url = 'https://www.leagueoflegends.com/fr-fr/news/game-updates/'
-# URL du webhook Discord
-discord_webhook_url = 'https://discord.com/api/webhooks/...'
 
-# Clé API OpenAI
-openai.api_key = 'VOTRE_CLE_OPENAI'
-
-# Fonction pour extraire les dernières actualités du site
 def get_latest_news():
     response = requests.get(site_url)
     soup = BeautifulSoup(response.text, 'html.parser')
-    articles = soup.find_all('a', class_='style__Wrapper-n3ovyt-3')  # Ajustez la classe CSS si nécessaire
+    articles = soup.find_all('a', class_='style__Wrapper-n3ovyt-3')
     latest_news = []
 
     for article in articles:
@@ -26,14 +24,14 @@ def get_latest_news():
             full_link = f"https://www.leagueoflegends.com{link}"
             latest_news.append(full_link)
 
+    print(f"Found articles: {latest_news}")
     return latest_news
 
-# Fonction pour récupérer et formater le contenu d'un article
 def generate_content(article_url):
+    print(f"Processing article: {article_url}")
     response = requests.get(article_url)
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    # Extraire les détails nécessaires
     article_title = soup.find('h1').text.strip()
     article_content = soup.find('div', class_='article-content')
     author_tag = soup.find('meta', {'name': 'author'})
@@ -42,7 +40,6 @@ def generate_content(article_url):
     published_date = datetime.fromisoformat(time_tag['datetime']) if time_tag else datetime.now()
     days_since_published = (datetime.now() - published_date).days
 
-    # Identifier dynamiquement les sections et leur contenu
     sections = {}
     current_section = None
     section_content = ""
@@ -56,11 +53,11 @@ def generate_content(article_url):
         elif element.name == 'p':
             section_content += element.text.strip() + "\n"
 
-    # Ajouter la dernière section si elle existe
     if current_section and section_content:
         sections[current_section] = section_content.strip()
 
-    # Préparer le prompt pour GPT-4
+    print(f"Extracted sections: {sections}")
+
     prompt = (
         f"Title: {article_title}\n\n"
         f"Author: {author}\n\n"
@@ -85,8 +82,8 @@ def generate_content(article_url):
 
     return response.choices[0].message['content'].strip()
 
-# Fonction pour publier sur Discord
 def post_to_discord(content):
+    print(f"Posting content to Discord:\n{content}")
     data = {
         'content': content
     }
@@ -96,7 +93,6 @@ def post_to_discord(content):
     else:
         print(f"Erreur lors de la publication : {response.status_code} - {response.text}")
 
-# Fonction principale pour vérifier les mises à jour
 def check_for_updates():
     latest_news = get_latest_news()
     try:
@@ -107,6 +103,8 @@ def check_for_updates():
 
     new_news = [article for article in latest_news if article not in published_news]
 
+    print(f"New articles found: {new_news}")
+
     if new_news:
         for article_url in new_news:
             generated_content = generate_content(article_url)
@@ -116,6 +114,5 @@ def check_for_updates():
         with open('published_news.json', 'w') as file:
             json.dump(latest_news, file)
 
-# Exécuter la vérification toutes les x minutes
 if __name__ == "__main__":
     check_for_updates()
