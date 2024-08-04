@@ -15,7 +15,8 @@ site_url = 'https://www.leagueoflegends.com/fr-fr/news/game-updates/'
 def get_latest_news():
     response = requests.get(site_url)
     soup = BeautifulSoup(response.text, 'html.parser')
-    articles = soup.find_all('a', class_='style__Wrapper-n3ovyt-3')
+    # Trouver tous les liens vers des articles de mise à jour de jeu
+    articles = soup.find_all('a', class_='style__Wrapper-n3ovyt-3')  # Ajustez la classe CSS ici si nécessaire
     latest_news = []
 
     for article in articles:
@@ -32,25 +33,29 @@ def generate_content(article_url):
     response = requests.get(article_url)
     soup = BeautifulSoup(response.text, 'html.parser')
 
+    # Trouver le titre de l'article
     article_title = soup.find('h1').text.strip()
-    article_content = soup.find('div', class_='article-content')
+    # Trouver le contenu de l'article
+    article_content = soup.find('div', class_='article-content')  # Assurez-vous que ce sélecteur est correct
     author_tag = soup.find('meta', {'name': 'author'})
     author = author_tag['content'] if author_tag else 'Riot Games'
     time_tag = soup.find('time')
     published_date = datetime.fromisoformat(time_tag['datetime']) if time_tag else datetime.now()
     days_since_published = (datetime.now() - published_date).days
 
+    # Identifier dynamiquement les sections et leur contenu
     sections = {}
     current_section = None
     section_content = ""
 
+    # Récupérer les éléments de la page
     for element in article_content.children:
-        if element.name in ['h2', 'h3']:
+        if element.name in ['h2', 'h3']:  # Titre de section
             if current_section and section_content:
                 sections[current_section] = section_content.strip()
             current_section = element.text.strip()
             section_content = ""
-        elif element.name == 'p':
+        elif element.name == 'p':  # Paragraphe de section
             section_content += element.text.strip() + "\n"
 
     if current_section and section_content:
